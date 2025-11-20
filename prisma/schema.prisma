@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------
+// USERS
+// -----------------------------------------------------
+model User {
+  id             Int       @id @default(autoincrement())
+  email          String    @unique
+  passwordHash   String
+  fullName       String
+  role           Role
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  createdWorkoutPlans   WorkoutPlan[]     @relation("CreatedPlans")
+  assignedWorkoutPlans  WorkoutPlan[]     @relation("AssignedPlans")
+
+  workouts              Workout[]          // old workout logs (you may remove later)
+  weights               Weight[]
+
+  coachLinks            AthleteCoach[]    @relation("CoachToAthlete")
+  athleteLinks          AthleteCoach[]    @relation("AthleteToCoach")
+  
+  SentMessages          Message[]  @relation("SentMessages")
+  ReceivedMessages      Message[]  @relation("ReceivedMessages")
+
+  workoutSessions       WorkoutSession[]   // NEW: athlete training sessions
+}
+
+enum Role {
+  athlete
+  coach
+}
+
+// -----------------------------------------------------
+// ATHLETE–COACH RELATION
+// -----------------------------------------------------
+model AthleteCoach {
+  id         Int     @id @default(autoincrement())
+  coachId    Int
+  athleteId  Int
+
+  coach      User    @relation("CoachToAthlete", fields: [coachId], references: [id])
+  athlete    User    @relation("AthleteToCoach", fields: [athleteId], references: [id])
+
+  @@unique([coachId, athleteId])
+}
+
+// -----------------------------------------------------
+// WORKOUT PLANS (TEMPLATE)
+// -----------------------------------------------------
+model WorkoutPlan {
+  id             Int       @id @default(autoincrement())
+  title          String
+  description    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  creatorId      Int
+  assignedToId   Int?
+
+  creator        User      @relation("CreatedPlans", fields: [creatorId], references: [id])
+  assignedTo     User?     @relation("AssignedPlans", fields: [assignedToId], references: [id])
+
+  exercises      WorkoutPlanExercise[]   // NEW
+  sessions       WorkoutSession[]        // NEW: workouts performed from this plan
+
+  workouts       Workout[]               // old legacy link
+}
+
+// -----------------------------------------------------
+// EXERCISES (global exercise library)
+// -----------------------------------------------------
+model Exercise {
+  id          Int               @id @default(autoincrement())
+  name        String            @unique
+  description String?
+  createdAt   DateTime          @default(now())
+
+  workoutExercises WorkoutExercise[]     // old
+  planExercises    WorkoutPlanExercise[] // NEW
+  sessionExercises WorkoutSessionExercise[] // NEW
+}
+
+// -----------------------------------------------------
+// PLAN EXERCISES (template exercises)
+// -----------------------------------------------------
+model WorkoutPlanExercise {
+  id         Int @id @default(autoincrement())
+  planId     Int
+  exerciseId Int
+  orderIndex Int @default(0)
+
+  plan       WorkoutPlan @relation(fields: [planId], references: [id])
+  exercise   Exercise    @relation(fields: [exerciseId], references: [id])
+}
+
+// -----------------------------------------------------
+// WORKOUT SESSION (every time athlete trains)
+// -----------------------------------------------------
+model WorkoutSession {
+  id         Int      @id @default(autoincrement())
+  athleteId  Int
+  planId     Int
+  date       DateTime @default(now())
+
+  athlete    User        @relation(fields: [athleteId], references: [id])
+  plan       WorkoutPlan @relation(fields: [planId], references: [id])
+
+  sessionExercises WorkoutSessionExercise[] // NEW
+}
+
+// -----------------------------------------------------
+// SESSION EXERCISES (copied from plan for the session)
+// -----------------------------------------------------
+model WorkoutSessionExercise {
+  id          Int @id @default(autoincrement())
+  sessionId   Int
+  exerciseId  Int
+  orderIndex  Int @default(0)
+
+  session     WorkoutSession @relation(fields: [sessionId], references: [id])
+  exercise    Exercise       @relation(fields: [exerciseId], references: [id])
+  sets        WorkoutSessionSet[]
+}
+
+// -----------------------------------------------------
+// SESSION SETS (reps + weight logs)
+// -----------------------------------------------------
+model WorkoutSessionSet {
+  id                  Int    @id @default(autoincrement())
+  sessionExerciseId   Int
+  setIndex            Int @default(1)
+  reps                Int
+  weightKg            Float
+  rpe                 Float?
+  notes               String?
+
+  sessionExercise     WorkoutSessionExercise @relation(fields: [sessionExerciseId], references: [id])
+
+  @@unique([sessionExerciseId, setIndex])
+}
+
+// -----------------------------------------------------
+// OLD WORKOUT STRUCTURE (optional, can be removed later)
+// -----------------------------------------------------
+model Workout {
+  id              Int        @id @default(autoincrement())
+  date            DateTime
+  durationMinutes Int
+  notes           String?
+  createdAt       DateTime   @default(now())
+
+  athleteId       Int
+  workoutPlanId   Int?
+
+  athlete         User        @relation(fields: [athleteId], references: [id])
+  workoutPlan     WorkoutPlan? @relation(fields: [workoutPlanId], references: [id])
+
+  workoutExercises WorkoutExercise[]
+}
+
+model WorkoutExercise {
+  id          Int          @id @default(autoincrement())
+  workoutId   Int
+  exerciseId  Int
+  orderIndex  Int          @default(0)
+  notes       String?
+
+  workout     Workout      @relation(fields: [workoutId], references: [id])
+  exercise    Exercise     @relation(fields: [exerciseId], references: [id])
+  sets        WorkoutSet[]
+
+  @@unique([workoutId, exerciseId, orderIndex])
+}
+
+model WorkoutSet {
+  id               Int     @id @default(autoincrement())
+  workoutExerciseId Int
+  setIndex         Int     @default(1)
+  reps             Int
+  weightKg         Float
+  rpe              Float?
+  notes            String?
+
+  workoutExercise  WorkoutExercise @relation(fields: [workoutExerciseId], references: [id])
+
+  @@unique([workoutExerciseId, setIndex])
+}
+
+// -----------------------------------------------------
+// WEIGHTS
+// -----------------------------------------------------
+model Weight {
+  id        Int       @id @default(autoincrement())
+  weightKg  Float
+  date      DateTime
+  createdAt DateTime  @default(now())
+
+  athleteId Int
+  athlete   User      @relation(fields: [athleteId], references: [id])
+}
+
+// -----------------------------------------------------
+// MESSAGES
+// -----------------------------------------------------
+model Message {
+  id          Int      @id @default(autoincrement())
+  senderId    Int
+  receiverId  Int
+  content     String
+  createdAt   DateTime @default(now())
+
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiver    User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+}
