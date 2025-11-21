@@ -51,7 +51,7 @@ let AuthService = class AuthService {
         catch (error) {
             if (error instanceof runtime_1.PrismaClientKnownRequestError) {
                 if (error.code === 'P2002') {
-                    throw new common_1.ForbiddenException('Credentials taken');
+                    throw new common_1.HttpException('Credentials taken', 422);
                 }
             }
             throw error;

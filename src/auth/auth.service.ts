@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { ForbiddenException, HttpException, Injectable } from "@nestjs/common";
 import { User } from "@prisma/client"
 import { PrismaService } from "src/prisma/prisma.service";
 import { RegisterDto, LoginDto } from "./dto";
@@ -50,7 +50,7 @@ export class AuthService{
         } catch(error) {
             if(error instanceof PrismaClientKnownRequestError){
                 if (error.code === 'P2002'){
-                    throw new ForbiddenException('Credentials taken');
+                    throw new HttpException('Credentials taken', 422);
                 }
             }
             throw error;

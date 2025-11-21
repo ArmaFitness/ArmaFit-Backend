@@ -26,7 +26,7 @@ let MessagesService = class MessagesService {
             },
         });
         if (!relation) {
-            throw new common_1.ForbiddenException('You cannot message this user.');
+            throw new common_1.HttpException('You cannot message this user.', 422);
         }
     }
     async sendMessage(senderId, dto) {

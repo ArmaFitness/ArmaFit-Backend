@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SendMessageDto } from './dto/send-message.dto';
 
@@ -18,7 +18,7 @@ export class MessagesService {
     });
 
     if (!relation) {
-      throw new ForbiddenException('You cannot message this user.');
+      throw new HttpException('You cannot message this user.', 422);
     }
   }
 
